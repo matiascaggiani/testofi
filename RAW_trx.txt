@@ -1,0 +1,91 @@
+empieza <- Sys.time()
+
+#########################################################
+#######################  LIBRARIES ###################### 
+#########################################################
+
+
+library(fpc)
+library(MuMIn)
+library(NbClust)
+library(cluster)
+library(factoextra)
+library(mclust)
+library(vegan)
+library(lubridate)
+
+#### SETEAR EL DIRECTORIO ####
+setwd("C:/Users/caggianim/Desktop/Cluster FINAL")
+
+#### CARGAR LOS DATOS ####
+
+Original <- read.csv2("segmentacioncash03112015.csv",header=T, sep=",", dec=",", na.strings=c("NULL"), as.is=T)
+RAW <- Original
+
+### Subset de transaccionales ###
+
+transaccionales <- names(RAW)[c(1,28:30,34)]
+RAW_transaccionales <- RAW[,transaccionales]
+
+### Loop para convertir variables a numericas ###
+
+numericas <- names(RAW_transaccionales)[c(2:5)]
+for (i in 1:ncol(RAW_transaccionales)){
+  if(names(RAW_transaccionales)[i] %in% numericas){
+    RAW_transaccionales[,i] <- as.numeric(RAW_transaccionales[,i])
+  }
+}                                       
+
+RAW_transaccionales[is.na(RAW_transaccionales)] <- 0
+
+
+#################################
+###### Defino Actividad #########
+#################################
+
+start.time <- Sys.time()
+
+activas <- names(RAW_transaccionales)[c(2:5)]
+auxiliar_3 <- NA
+for(i in 1:nrow(RAW_transaccionales)){
+  auxiliar_3[i] <- sum(RAW_transaccionales[i, activas])
+}
+
+activos <- auxiliar_3
+
+RAW_transaccionales <- cbind(RAW_transaccionales,activos)
+
+RAW_transaccionales_activos <- subset(RAW_transaccionales,RAW_transaccionales$activos !=0)
+
+end.time <- Sys.time()
+time.taken <- end.time - start.time
+time.taken
+
+#########################################################
+###############  Filtrar Atipicos en TRX ################ 
+#########################################################
+
+atipicos <- RAW_transaccionales_activos[,2:ncol(RAW_transaccionales_activos)]
+mat_aux <- matrix(0, nrow(atipicos), ncol(atipicos))
+
+for(i in 1:ncol(atipicos)){
+  aux <- atipicos[,i]  
+  ext_sup <- quantile(aux, 0.75) + 3 * IQR(aux)   
+  mat_aux[which(aux>ext_sup),i] <- 1 
+}
+
+sumatoria <- apply(mat_aux, 1, sum)
+trx <- RAW_transaccionales_activos[which(sumatoria==0), ]
+trx_atipicos <-  RAW_transaccionales_activos[which(sumatoria!=0), ]
+
+#########################################################
+####################  Exportar TRX ###################### 
+#########################################################
+
+write.table(trx, "trx.csv", row.names = FALSE, dec = ",", sep = ";")
+write.table(trx_atipicos, "trx_atipicos.csv", row.names = FALSE, dec = ",", sep = ";")
+
+termina <- Sys.time()
+
+tiempototal <- empieza - termina
+tiempototal
