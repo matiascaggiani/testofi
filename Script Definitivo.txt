@@ -1,0 +1,262 @@
+## Carga de Datos ##
+setwd("//ferrere8/Economia/CASH/3. Segmentación de Cartera/Clusters")
+Original <- read.csv2("Clientes activos anual.csv", header=T, sep=";", dec=",", na.strings=c("NULL"), as.is=T)
+
+
+#### NUMERICAS ####
+
+numericas <- names(Original)[c(8,13:15,25,42,45,48,51)] ### defino vector auxiliar con variables numericas ###
+
+
+for (i in 1:ncol(Original)){
+  if(names(Original)[i] %in% numericas){
+    Original[,i] <- as.numeric(Original[,i])
+  }
+}	
+
+
+## Carga de Paquetes ##
+library("lubridate")
+library("fpc")
+library("NbClust")
+
+## Compilación variables año 1 de semestral a anual ##
+CuotasAVG_0a12_M <- (((Original$PromedioCuotas_0_6_Meses)*(Original$X.Operaciones_0_6_Meses) + (Original$PromedioCuotas_7_12_Meses)*(Original$X.Operaciones_7_12_Meses))/ (Original$X.Operaciones_0_6_Meses + Original$X.Operaciones_7_12_Meses))
+CuotasAVG_0a12_M[which(is.nan(CuotasAVG_0a12_M))] <- 0
+MontosAVG_0a12_M <- (((Original$PromedioMontos_0_6_Meses)*(Original$X.Operaciones_0_6_Meses) + (Original$PromedioMontos_7_12_Meses)*(Original$X.Operaciones_7_12_Meses))/ (Original$X.Operaciones_0_6_Meses + Original$X.Operaciones_7_12_Meses))
+MontosAVG_0a12_M[which(is.nan(MontosAVG_0a12_M))] <- 0
+
+## Generar variables Antiguedad y Edad ##
+
+Original$fechaNacimiento <- ymd_hm(Original$fechaNacimiento)
+
+Edad <- difftime(today(), Original$fechaNacimiento, units = "days")
+Edad <- as.numeric(Edad)/365.25
+Edad <- floor(Edad)
+
+Original <- cbind(Original, Edad)
+
+## Categorizar variables Edad, Ingresos, Antiguedad, Atrasos ##
+
+Edad_cat <- cut(Original$Edad, c(17,21,23,25,30,180))
+Original <- cbind(Original, Edad_cat)
+
+Ingresos_cat <- cut(Original$IngMesnsuales,c(-1000,15000,20000,35000,70000,500000),
+                    c("Hasta $15000","Entre $15000 y $20000", "Entre $20000 y $35000",
+                      "Entre $35000 y 70000","Mas de $70000"),include.lowest=T)
+Original <- cbind(Original, Ingresos_cat)
+
+Antiguedad_cat <- cut(Original$Antiguedad,c(0,180,365,540,730,1460,10000),
+                      c("Entre 0 y 6 meses","Entre 6 y 12 meses", "Entre 12 y 18 meses",
+                        "Entre 18 y 24 meses", "Entre 24 y 48 meses","Mas de 48 meses"),
+                      include.lowest=T)
+Original <- cbind(Original, Antiguedad_cat)
+
+MaxAtraso_cat <- cut(Original$MaxAtraso,c(0,180,365,540,730,1460,10000),
+                     c("Entre 0 y 6","Entre 6 y 12", "Entre 12 y 18", "Entre 18 y 24",
+                       "Entre 24 y 48","Mas de 48"),include.lowest=T)
+Original <- cbind(Original, MaxAtraso_cat)
+
+Atraso1Mes_cat <- cut(Original$Atraso1Mes,c(0,180,365,540,730,1460,10000),
+                      c("Entre 0 y 6","Entre 6 y 12", "Entre 12 y 18", "Entre 18 y 24",
+                        "Entre 24 y 48","Mas de 48"),include.lowest=T)
+Original <- cbind(Original, Atraso1Mes_cat)
+
+Atraso3Meses_cat <- cut(Original$Atraso3Meses,c(0,180,365,540,730,1460,10000),
+                        c("Entre 0 y 6","Entre 6 y 12", "Entre 12 y 18",
+                          "entre 18 y 24", "Entre 24 y 48","Mas de 48"),include.lowest=T)
+Original <- cbind(Original, Atraso3Meses_cat)
+
+## Renombrar variables ##
+Operaciones_0a12_M <- Original$Operaciones_Ano1
+names(Original)[names(Original)=="Operaciones_Ano1"] <- "Operaciones_0a12_M"
+
+Operaciones_0a6_M <- Original$X.Operaciones_0_6_Meses
+names(Original)[names(Original)=="X.Operaciones_0_6_Meses"] <- "Operaciones_0a6_M"
+
+Operaciones_7a12_M <- Original$X.Operaciones_7_12_Meses
+names(Original)[names(Original)=="X.Operaciones_7_12_Meses"] <- "Operaciones_7a12_M"
+
+Operaciones_13a24_M <- Original$X.Operaciones_13_24_Meses
+names(Original)[names(Original)=="X.Operaciones_13_24_Meses"] <- "Operaciones_13a24_M"
+
+Operaciones_25a36_M <- Original$X.Operaciones_25_36_Meses
+names(Original)[names(Original)=="X.Operaciones_25_36_Meses"] <- "Operaciones_25a36_M"
+
+CuotasAVG_0a6_M <- Original$PromedioCuotas_0_6_Meses
+names(Original)[names(Original)=="PromedioCuotas_0_6_Meses"] <- "CuotasAVG_0a6_M"
+
+CuotasAVG_7a12_M <- Original$PromedioCuotas_7_12_Meses
+names(Original)[names(Original)=="PromedioCuotas_7_12_Meses"] <- "CuotasAVG_7a12_M"
+
+CuotasAVG_13a24_M <- Original$PromedioCuotas_13_24_Meses
+names(Original)[names(Original)=="PromedioCuotas_13_24_Meses"] <- "CuotasAVG_13a24_M"
+
+CuotasAVG_25a36_M <- Original$PromedioCuotas_25_36_Meses
+names(Original)[names(Original)=="PromedioCuotas_25_36_Meses"] <- "CuotasAVG_25a36_M"
+
+MontosAVG_0a6_M <- Original$PromedioMontos_0_6_Meses
+names(Original)[names(Original)=="PromedioMontos_0_6_Meses"] <- "MontosAVG_0a6_M"
+
+MontosAVG_7a12_M <- Original$PromedioMontos_7_12_Meses
+names(Original)[names(Original)=="PromedioMontos_7_12_Meses"] <- "MontosAVG_7a12_M"
+
+MontosAVG_13a24_M <- Original$PromedioMontos_13_24_Meses
+names(Original)[names(Original)=="PromedioMontos_13_24_Meses"] <- "MontosAVG_13a24_M"
+
+MontosAVG_25a36_M <- Original$PromedioMontos_25_36_Meses
+names(Original)[names(Original)=="PromedioMontos_25_36_Meses"] <- "MontosAVG_25a36_M"
+
+## Generación Tabla para Clusters con Año 1 dividido en Semestres (Ops, Montos, Cuotas) ### 
+Cluster_trx_s <- data.frame("idSocio"=Original$idSocio, Edad, Operaciones_0a6_M,
+                            Operaciones_7a12_M, Operaciones_13a24_M, Operaciones_25a36_M,
+                            CuotasAVG_0a6_M, CuotasAVG_7a12_M, CuotasAVG_13a24_M,
+                            CuotasAVG_25a36_M, MontosAVG_0a6_M, MontosAVG_7a12_M,
+                            MontosAVG_13a24_M, MontosAVG_25a36_M)
+
+## Generación Tabla para Clusters con Datos Anuales (Ops, Montos, Cuotas) ### 
+Cluster_trx_a <- data.frame("idSocio"=Original$idSocio, Edad, Operaciones_0a12_M,
+                            Operaciones_13a24_M, Operaciones_25a36_M, CuotasAVG_0a12_M,
+                            CuotasAVG_13a24_M, CuotasAVG_25a36_M, MontosAVG_0a12_M,
+                            MontosAVG_13a24_M, MontosAVG_25a36_M)
+
+###  Filtrar Datos Atípicos para Clusterizar SEMESTRAL### 
+
+auxiliar <- Cluster_trx_s[,3:ncol(Cluster_trx_s)]
+mat_aux <- matrix(0, nrow(auxiliar), ncol(auxiliar))
+
+for(i in 1:ncol(auxiliar)){
+  aux <- auxiliar[,i]  
+  ext_sup <- quantile(aux, 0.75) + 3 * IQR(aux)   
+  mat_aux[which(aux>ext_sup),i] <- 1 
+}
+
+sumatoria <- apply(mat_aux, 1, sum)
+Cluster_trx_sem_aux <- Cluster_trx_s[which(sumatoria==0), ]
+
+
+### Limpieza de atipicos en la fecha SEMESTRAL###
+
+Cluster_trx_sem <- Cluster_trx_sem_aux[which(Cluster_trx_sem_aux$Edad < 110) , ]
+
+###  Filtrar Datos Atípicos para Clusterizar ANUAL### 
+
+auxiliar <- Cluster_trx_a[,3:ncol(Cluster_trx_a)]
+mat_aux <- matrix(0, nrow(auxiliar), ncol(auxiliar)) 
+
+for(i in 1:ncol(auxiliar)){aux <- auxiliar[,i]  
+ext_sup <- quantile(aux, 0.75) + 3 * IQR(aux)   
+mat_aux[which(aux>ext_sup),i] <- 1 
+}
+
+sumatoria <- apply(mat_aux, 1, sum)
+Cluster_trx_anual_aux <- Cluster_trx_a[which(sumatoria==0), ]
+
+### Limpieza de atipicos en la fecha ANUAL###
+
+
+Cluster_trx_anual <- Cluster_trx_anual_aux[which(Cluster_trx_anual_aux$Edad < 110) , ]
+
+
+## Plot Bivariado Datos Anuales ##
+#Ops - Yr vs Yr#
+plot(Cluster_trx_anual$Operaciones_0a12_M, Cluster_trx_anual$Operaciones_13a24_M)
+plot(Cluster_trx_anual$Operaciones_0a12_M, Cluster_trx_anual$Operaciones_25a36_M)
+plot(Cluster_trx_anual$Operaciones_13a24_M, Cluster_trx_anual$Operaciones_25a36_M)
+#Cuotas - Yr vs Yr#
+plot(Cluster_trx_anual$CuotasAVG_0a12_M, Cluster_trx_anual$CuotasAVG_13a24_M)
+plot(Cluster_trx_anual$CuotasAVG_0a12_M, Cluster_trx_anual$CuotasAVG_25a36_M)
+plot(Cluster_trx_anual$CuotasAVG_13a24_M, Cluster_trx_anual$CuotasAVG_25a36_M)
+#Montos - Yr vs Yr#
+plot(Cluster_trx_anual$MontosAVG_0a12_M, Cluster_trx_anual$MontosAVG_13a24_M)
+plot(Cluster_trx_anual$MontosAVG_0a12_M, Cluster_trx_anual$MontosAVG_25a36_M)
+plot(Cluster_trx_anual$MontosAVG_13a24_M, Cluster_trx_anual$MontosAVG_25a36_M)
+# 0a12_M - Ops vs Cuotas vs Montos#
+plot(Cluster_trx_anual$Operaciones_0a12_M, Cluster_trx_anual$CuotasAVG_0a12_M)
+plot(Cluster_trx_anual$Operaciones_0a12_M, Cluster_trx_anual$MontosAVG_0a12_M)
+plot(Cluster_trx_anual$CuotasAVG_0a12_M, Cluster_trx_anual$MontosAVG_0a12_M)
+# 13a24_M - Ops vs Cuotas vs Montos#
+plot(Cluster_trx_anual$Operaciones_13a24_M, Cluster_trx_anual$CuotasAVG_13a24_M)
+plot(Cluster_trx_anual$Operaciones_13a24_M, Cluster_trx_anual$MontosAVG_13a24_M)
+plot(Cluster_trx_anual$CuotasAVG_13a24_M, Cluster_trx_anual$MontosAVG_13a24_M)
+# 25a36_M - Ops vs Cuotas vs Montos#
+plot(Cluster_trx_anual$Operaciones_25a36_M, Cluster_trx_anual$CuotasAVG_25a36_M)
+plot(Cluster_trx_anual$Operaciones_25a36_M, Cluster_trx_anual$MontosAVG_25a36_M)
+plot(Cluster_trx_anual$CuotasAVG_25a36_M, Cluster_trx_anual$MontosAVG_25a36_M)
+
+## Separación en Muestra de Entrenamiento y Testeo ##
+train <- runif(nrow(Cluster_trx_anual))
+Set_train <- Cluster_trx_anual[train<=0.1,]
+Set_test <- Cluster_trx_anual[train>0.1,]
+
+## Evaluación de Cantidad de Clusters, Kmeans, Pseudot2 ##
+NbClust(Set_train[3:11], diss = NULL, distance = "euclidean", 
+        min.nc = 2, max.nc = 15, method = "kmeans", index = "ch", alphaBeale = 0.1)
+
+## Ploteo de Numero de Clusters ("Elbow Criterion") ##
+wss <- (nrow(Cluster_trx_anual)-1)*sum(apply(Cluster_trx_anual,2,var))
+for(i in 2:15) wss[i] <- sum(fit=kmeans(Cluster_trx_anual,centers=i,15)$withinss)
+
+plot(1:15,wss,type="b",main="15 clusters",xlab="Numero de Clusters",
+     ylab="Suma de Cuadrado Intra")
+
+## Modelado ##
+centros <- 7
+Clusters <- kmeans(Cluster_trx_anual[,3:ncol(Cluster_trx_anual)], centers = centros, 
+                   iter.max = 10)
+Cluster_trx_clus <- cbind(Cluster_trx_anual, "Cluster"=Clusters$cluster)
+
+##  Descripción de Clusters en base a Variables utilizadas para Segmentar ##
+Desc_Clusters <- data.frame(tapply( Cluster_trx_clus[ ,2], Cluster_trx_clus$Cluster, mean),Clusters$centers)
+
+
+colnames(Desc_Clusters) <- names(Cluster_trx_clus)[2:11] ###AJUSTAR DE ACUERDO A LAS COLUMNAS QUE HAY
+round(Desc_Clusters,3)
+
+## Join tabla original con clústeres sin Atípicos ##
+Original_clus_sinatipicos <- merge(Cluster_trx_clus, Original, by=intersect(names(Cluster_trx_clus), names(Original)))
+
+## Analisis Descriptivo Clusters en Base sin Atípicos ##
+prop.table(table(Original_clus_sinatipicos$Cluster))
+prop.table(table(Original_clus_sinatipicos$CodPostal,Original_clus_sinatipicos$Cluster),2)
+prop.table(table(Original_clus_sinatipicos$Localidad,Original_clus_sinatipicos$Cluster),2)
+prop.table(table(Original_clus_sinatipicos$Departamento,Original_clus_sinatipicos$Cluster),2)
+prop.table(table(Original_clus_sinatipicos$estadoCivil,Original_clus_sinatipicos$Cluster),2)
+prop.table(table(Original_clus_sinatipicos$Sexo,Original_clus_sinatipicos$Cluster),2)
+prop.table(table(Original_clus_sinatipicos$Antiguedad_cat,Original_clus_sinatipicos$Cluster),2)
+prop.table(table(Original_clus_sinatipicos$Edad_cat,Original_clus_sinatipicos$Cluster),2)
+prop.table(table(Original_clus_sinatipicos$Ingresos_cat,Original_clus_sinatipicos$Cluster),2)
+prop.table(table(Original_clus_sinatipicos$EmpConvenio,Original_clus_sinatipicos$Cluster),2)
+prop.table(table(Original_clus_sinatipicos$CalificacionBCU,Original_clus_sinatipicos$Cluster),2)
+prop.table(table(Original_clus_sinatipicos$Actividad,Original_clus_sinatipicos$Cluster),2)
+prop.table(table(Original_clus_sinatipicos$ultOpeSucursal,Original_clus_sinatipicos$Cluster),2)
+prop.table(table(Original_clus_sinatipicos$ultOpeFormaPago,Original_clus_sinatipicos$Cluster),2)
+prop.table(table(Original_clus_sinatipicos$tarjetaPass,Original_clus_sinatipicos$Cluster),2)
+prop.table(table(Original_clus_sinatipicos$MaxAtraso_cat,Original_clus_sinatipicos$Cluster),2)
+prop.table(table(Original_clus_sinatipicos$Atraso1Mes_cat,Original_clus_sinatipicos$Cluster),2)
+prop.table(table(Original_clus_sinatipicos$Atraso3Meses_cat,Original_clus_sinatipicos$Cluster),2)
+
+## Predict Cluster sobre Base Completa Activos ##
+pred_all <- as.data.frame(predict(Clusters, newdata=Cluster_trx_a, type="response"))
+colnames(pred_all) <- c("Cluster")
+Completa <- cbind(Original, Cluster_trx_a, pred_all)
+
+## Analisis Descriptivo Clusters en Base Completa Activos ##
+prop.table(table(Completa$Cluster))
+prop.table(table(Completa$CodPostal,Completa$Cluster),2)
+prop.table(table(Completa$Localidad,Completa$Cluster),2)
+prop.table(table(Completa$Departamento,Completa$Cluster),2)
+prop.table(table(Completa$EstadoCivil,Completa$Cluster),2)
+prop.table(table(Completa$Sexo,Completa$Cluster),2)
+prop.table(table(Completa$Antiguedad_cat,Completa$Cluster),2)
+prop.table(table(Completa$Edad_cat,Completa$Cluster),2)
+prop.table(table(Completa$Ingresos_cat,Completa$Cluster),2)
+prop.table(table(Completa$EmpConvenio,Completa$Cluster),2)
+prop.table(table(Completa$CalificacionBCU,Completa$Cluster),2)
+prop.table(table(Completa$Actividad,Completa$Cluster),2)
+prop.table(table(Completa$ultOpeSucursal,Completa$Cluster),2)
+prop.table(table(Completa$ultOpeFormaPago,Completa$Cluster),2)
+prop.table(table(Completa$TarjetaPass,Completa$Cluster),2)
+prop.table(table(Completa$MaxAtraso_cat,Completa$Cluster),2)
+prop.table(table(Completa$Atraso1Mes_cat,Completa$Cluster),2)
+prop.table(table(Completa$Atraso3Meses_cat,Completa$Cluster),2)
